@@ -1,60 +1,102 @@
 "use client"
 
+import { useEffect, useState } from "react"
+import {
+  onAuthStateChanged,
+  updatePassword,
+  User,
+} from "firebase/auth"
+import { auth } from "@/firebase/firebase"
+import { db } from "@/firebase/firebase" // Firestore DB
+import {
+  doc,
+  getDoc,
+  setDoc,
+  updateDoc,
+} from "firebase/firestore"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import Sidebar from "@/components/sidebar"
-import { useState } from "react"
 import { toast } from "@/components/ui/use-toast"
 
 export default function AccountPage() {
+  const [userData, setUserData] = useState({
+    storedmail: "",
+    firstName: "",
+    lastName: "",
+  })
+
   const [passwordData, setPasswordData] = useState({
-    newPassword: '',
-    confirmPassword: ''
+    newPassword: "",
+    confirmPassword: "",
   })
+
   const [errors, setErrors] = useState({
-    newPassword: '',
-    confirmPassword: ''
+    newPassword: "",
+    confirmPassword: "",
   })
+
   const [isUpdating, setIsUpdating] = useState(false)
+  const [currentUser, setCurrentUser] = useState<User | null>(null)
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (user) {
+        const email = user.email || ""
+        const displayName = user.displayName || ""
+        const nameParts = displayName.split(" ")
+        const firstName = nameParts[0] || ""
+        const lastName = nameParts.slice(1).join(" ") || ""
+
+        setUserData({
+          storedmail: email,
+          firstName,
+          lastName,
+        })
+        setCurrentUser(user)
+      } else {
+        toast({
+          title: "Error",
+          description: "User not authenticated",
+          variant: "destructive",
+        })
+      }
+    })
+
+    return () => unsubscribe()
+  }, [])
 
   const handlePasswordChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target
-    setPasswordData(prev => ({
-      ...prev,
-      [name]: value
-    }))
+    setPasswordData((prev) => ({ ...prev, [name]: value }))
 
-    // Clear error when user types
     if (errors[name as keyof typeof errors]) {
-      setErrors(prev => ({
-        ...prev,
-        [name]: ''
-      }))
+      setErrors((prev) => ({ ...prev, [name]: "" }))
     }
   }
 
   const validatePasswords = () => {
     let isValid = true
     const newErrors = {
-      newPassword: '',
-      confirmPassword: ''
+      newPassword: "",
+      confirmPassword: "",
     }
 
     if (!passwordData.newPassword) {
-      newErrors.newPassword = 'New password is required'
+      newErrors.newPassword = "New password is required"
       isValid = false
     } else if (passwordData.newPassword.length < 8) {
-      newErrors.newPassword = 'Password must be at least 8 characters'
+      newErrors.newPassword = "Password must be at least 8 characters"
       isValid = false
     }
 
     if (!passwordData.confirmPassword) {
-      newErrors.confirmPassword = 'Please confirm your password'
+      newErrors.confirmPassword = "Please confirm your password"
       isValid = false
     } else if (passwordData.newPassword !== passwordData.confirmPassword) {
-      newErrors.confirmPassword = 'Passwords do not match'
+      newErrors.confirmPassword = "Passwords do not match"
       isValid = false
     }
 
@@ -64,32 +106,50 @@ export default function AccountPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    
-    if (!validatePasswords()) {
-      return
-    }
+
+    if (!validatePasswords()) return
 
     setIsUpdating(true)
-    
-    try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000))
-      
-      toast({
-        title: "Success",
-        description: "Password updated successfully",
-        variant: "default",
-      })
 
-      // Reset form
-      setPasswordData({
-        newPassword: '',
-        confirmPassword: ''
-      })
-    } catch (error) {
+    try {
+      const user = auth.currentUser
+
+      if (user) {
+        await updatePassword(user, passwordData.newPassword)
+
+        // Store password in Firestore (for demo purposes only!)
+        const userRef = doc(db, "users", user.uid)
+        const userSnap = await getDoc(userRef)
+
+        if (userSnap.exists()) {
+          await updateDoc(userRef, {
+            password: passwordData.newPassword,
+          })
+        } else {
+          await setDoc(userRef, {
+            email: user.email,
+            password: passwordData.newPassword,
+          })
+        }
+
+        toast({
+          title: "Success",
+          description: "Password updated successfully",
+          variant: "default",
+        })
+
+        setPasswordData({ newPassword: "", confirmPassword: "" })
+      } else {
+        toast({
+          title: "Error",
+          description: "No authenticated user found",
+          variant: "destructive",
+        })
+      }
+    } catch (error: any) {
       toast({
         title: "Error",
-        description: "Failed to update password",
+        description: error.message || "Failed to update password",
         variant: "destructive",
       })
     } finally {
@@ -100,7 +160,6 @@ export default function AccountPage() {
   return (
     <div className="flex min-h-screen bg-gray-50">
       <Sidebar isAdmin={false} />
-
       <div className="flex-1 md:ml-64 p-8">
         <div className="space-y-6 max-w-4xl mx-auto">
           <div>
@@ -115,7 +174,7 @@ export default function AccountPage() {
             <CardContent className="space-y-4">
               <div className="space-y-1">
                 <Label>Business Owner</Label>
-                <p className="text-sm text-muted-foreground">networkrhinos@gmail.com</p>
+                <p className="text-sm text-muted-foreground">{userData.storedmail}</p>
               </div>
             </CardContent>
           </Card>
@@ -128,16 +187,16 @@ export default function AccountPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="firstName">First Name</Label>
-                  <Input id="firstName" value="Vishnu" readOnly />
+                  <Input id="firstName" value={userData.firstName} readOnly />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="lastName">Last Name</Label>
-                  <Input id="lastName" value="vishnu" readOnly />
+                  <Input id="lastName" value={userData.lastName} readOnly />
                 </div>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="language">E-mail</Label>
-                <Input id="language" value="networkrhinos@gmail.com" readOnly />
+                <Label htmlFor="email">E-mail</Label>
+                <Input id="email" value={userData.storedmail} readOnly />
               </div>
             </CardContent>
           </Card>

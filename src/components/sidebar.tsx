@@ -30,25 +30,18 @@ export default function Sidebar({ isAdmin = false }: SidebarProps) {
   const [open, setOpen] = useState(false)
   const [mounted, setMounted] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [uid, setUid] = useState<string | null>(null)
 
   useEffect(() => {
     setMounted(true)
+    const storedUid = localStorage.getItem("uid")
+    setUid(storedUid)
   }, [])
 
   const adminLinks = [
     { name: "Dashboard", href: "/components/admin/dashboard", icon: BarChart3 },
     { name: "Businesses", href: "/components/admin/businesses", icon: Building },
     { name: "Users", href: "/components/admin/users", icon: Users },
-    // { 
-    //   name: "Settings", 
-    //   href: "/components/admin/settings", 
-    //   icon: Settings,
-    //   subLinks: [
-    //     { name: "Account", href: "/components/admin/settings/account", icon: User },
-    //     { name: "Locations", href: "/components/admin/settings/locations", icon: MapPin },
-    //     { name: "Business Users", href: "/components/admin/settings/business-users", icon: Users }
-    //   ]
-    // },
   ]
 
   const businessLinks = [
@@ -70,7 +63,8 @@ export default function Sidebar({ isAdmin = false }: SidebarProps) {
   const links = isAdmin ? adminLinks : businessLinks
 
   const handleLogout = () => {
-    window.location.href = "/login"
+    localStorage.removeItem("uid")  // Clear UID on logout
+    window.location.href = "/login" // Redirect to login
   }
 
   const isSettingsActive = (pathname: string) => {
@@ -81,10 +75,7 @@ export default function Sidebar({ isAdmin = false }: SidebarProps) {
     <div className="h-full flex flex-col pt-12 bg-orange-50 text-orange-900 shadow-md rounded-r-xl overflow-hidden animate-fade-in">
       
       <div className="flex-1 px-5 py-6 overflow-y-auto">
-        <nav
-          className="space-y-2"
-          aria-label={isAdmin ? "Admin navigation" : "Business navigation"}
-        >
+        <nav className="space-y-2" aria-label={isAdmin ? "Admin navigation" : "Business navigation"}>
           {links.map((link, index) => {
             const isActive = pathname === link.href || (link.name === "Settings" && isSettingsActive(pathname))
             const hasSubLinks = link.subLinks && link.subLinks.length > 0
@@ -161,6 +152,9 @@ export default function Sidebar({ isAdmin = false }: SidebarProps) {
       </div>
 
       <div className="p-4 border-t border-orange-200">
+        {uid && (
+          <p className="text-xs px-1 pb-2 text-orange-600">UID: {uid}</p>
+        )}
         <Button
           variant="ghost"
           className="w-full flex items-center gap-3 justify-start text-red-600 hover:text-white hover:bg-red-500 px-4 py-2 transition-all duration-300 rounded-lg"

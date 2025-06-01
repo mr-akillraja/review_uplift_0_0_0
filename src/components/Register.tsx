@@ -19,8 +19,6 @@ import {
   serverTimestamp,
 } from "firebase/firestore";
 
-// ... [same imports]
-
 export default function RegistrationForm() {
   const [showEmailForm, setShowEmailForm] = useState(false);
   const [username, setUsername] = useState("");
@@ -61,12 +59,13 @@ export default function RegistrationForm() {
         uid,
         username,
         email,
+        storedmail: email,
         role: "BUSER",
         createdAt: serverTimestamp(),
-        isProfileComplete: false, // ✅
+        isProfileComplete: false,
       });
 
-      navigate("/businessform");
+      navigate("/businessform", { state: { uid } });
     } catch (err: any) {
       setError(err.message || "Registration failed");
     } finally {
@@ -89,13 +88,14 @@ export default function RegistrationForm() {
       await setDoc(doc(db, "users", user.uid), {
         uid: user.uid,
         email: user.email,
+        storedmail: user.email,
         displayName: user.displayName || "",
         role: "BUSER",
         createdAt: serverTimestamp(),
-        isProfileComplete: false, // ✅
+        isProfileComplete: false,
       });
 
-      navigate("/businessform");
+      navigate("/businessform", { state: { uid: user.uid } });
     } catch (err: any) {
       setError(err.message || "Google sign-in failed");
     } finally {
